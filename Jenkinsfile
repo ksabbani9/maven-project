@@ -1,9 +1,15 @@
 pipeline {
     agent any
-    tools{
-      maven 'localMaven'
+
+    parameters {
+         string(name: 'tomcat_dev', defaultValue: '18.188.174.68', description: 'Staging Server')
     }
-    stages{
+
+    triggers {
+         pollSCM('* * * * *')
+     }
+
+stages{
         stage('Build'){
             steps {
                 sh 'mvn clean package'
@@ -15,28 +21,15 @@ pipeline {
                 }
             }
         }
-        stage ('Deploy to Staging'){
-            steps {
-                build job: 'deploy-to-staging'
-            }
-        }
-        stage ('Deploy to Production'){
-            steps{
-                timeout(time:5, unit:'DAYS'){
-                    input message:'Approve PRODUCTION Deployment?'
+
+        stage ('Deployments'){
+            parallel{
+                stage ('Deploy to Staging'){
+                    steps {
+                        sh "scp -i /Users/v5103887/gittomcat-demo.pem **/target/*.war ec2-user@${params.tomcat_dev}:/var/lib/tomcat8/webapps"
+                    }
                 }
 
-                build job: 'deploy-to-prod'
-            }
-            post {
-                success {
-                    echo 'Code deployed to Production.'
-                    echo 'Karunakar Success'
-                }
-
-                failure {
-                    echo ' Deployment failed.'
-                }
             }
         }
     }
